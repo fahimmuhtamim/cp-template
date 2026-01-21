@@ -152,7 +152,7 @@ struct WaveletTree {
 };
 
 template <typename T>
-vector<T> compute_sos_dp(vector<T> A, int num_bits) {
+vector<T> sos_dp(vector<T> A, int num_bits) {
     int size = 1 << num_bits;
     for (int i = 0; i < num_bits; ++i) {
         for (int mask = 0; mask < size; ++mask) {
@@ -308,4 +308,5 @@ int main() {
     }
     
     return 0;
+
 }
