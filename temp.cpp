@@ -1,312 +1,255 @@
 #include <iostream>
 #include <vector>
-#include <algorithm>
 #include <cmath>
-#include <cstring>
-#include <string>
-#include <map>
-#include <set>
-#include <queue>
-#include <stack>
-#include <deque>
-#include <unordered_map>
-#include <unordered_set>
-#include <limits>
-#include <numeric>
+#include <iomanip>
+
 using namespace std;
 
-using ll = long long;
-using pii = pair<int, int>;
-using vi = vector<int>;
-using vll = vector<ll>;
-const int INF = 1e9;
-const ll LINF = 1e18;
-const int MOD = 1e9 + 7;
+using ld = long double;
+const ld EPS = 1e-9;
+const ld PI = acos(-1.0);
 
-#define all(x) (x).begin(), (x).end()
-#define rall(x) (x).rbegin(), (x).rend()
-#define pb push_back
-#define sz(x) (int)(x).size()
+struct Point {
+    ld x, y;
+    Point operator+(const Point& other) const { return {x + other.x, y + other.y}; }
+    Point operator-(const Point& other) const { return {x - other.x, y - other.y}; }
+    Point operator*(ld scalar) const { return {x * scalar, y * scalar}; }
+    Point operator/(ld scalar) const { return {x / scalar, y / scalar}; }
+};
 
-void fast_io() {
-    ios_base::sync_with_stdio(false);
-    cin.tie(NULL);
+struct Line {
+    ld a, b, c; // ax + by + c = 0
+};
+
+// Get equation of line from two points
+Line lineFromPoints(Point p1, Point p2) {
+    ld a = p1.y - p2.y;
+    ld b = p2.x - p1.x;
+    ld c = -a * p1.x - b * p1.y;
+    return {a, b, c};
 }
 
-template<typename T>
-istream& operator>>(istream& is, vector<T>& v) {
-    for (T& x : v) is >> x;
-    return is;
+// Returns {true, point} if they intersect, {false, {0,0}} if parallel
+pair<bool, Point> intersect(Line l1, Line l2) {
+    ld det = l1.a * l2.b - l2.a * l1.b;
+    if (abs(det) < EPS) return {false, {0, 0}}; // Parallel
+    ld x = (l1.b * l2.c - l2.b * l1.c) / det;
+    ld y = (l1.c * l2.a - l2.c * l1.a) / det;
+    return {true, {x, y}};
 }
 
-template<typename T>
-ostream& operator<<(ostream& os, const vector<T>& v) {
-    for (int i = 0; i < sz(v); ++i) os << v[i] << (i == sz(v) - 1 ? "" : " ");
-    return os;
+ld triangleArea(Point a, Point b, Point c) {
+    return abs(a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y)) / 2.0;
 }
 
-template<typename T>
-class SegmentTree {
-    int n;
-    vector<T> tree;
-    T neutral;
+// Perpendicular line to another line going through a given point
+Line perpendicularLine(Line l, Point p) {
+    // Original: ax + by + c = 0 -> Perpendicular: -bx + ay + d = 0
+    ld newA = -l.b;
+    ld newB = l.a;
+    ld newC = -newA * p.x - newB * p.y;
+    return {newA, newB, newC};
+}
+
+// Reflection of a point over a line
+Point reflectPoint(Point p, Line l) {
+    ld dist = (l.a * p.x + l.b * p.y + l.c) / (l.a * l.a + l.b * l.b);
+    return {p.x - 2 * l.a * dist, p.y - 2 * l.b * dist};
+}
+
+ld dist(Point p1, Point p2) {
+    // hypot(dx, dy) is equivalent to sqrt(dx*dx + dy*dy) but safer against overflow
+    return hypot(p1.x - p2.x, p1.y - p2.y);
+}
+
+ld dist(Point p1, Point p2) {
+    return hypot(p1.x - p2.x, p1.y - p2.y);
+}
+
+vector<Line> angleBisectors(Line l1, Line l2) {
+    ld d1 = hypot(l1.a, l1.b);
+    ld d2 = hypot(l2.a, l2.b);
     
-    // Merge function (Sum/Min/Max/XOR)
-    T merge(T a, T b) {
-        return a + b; 
-    }
-
-    void build(const vector<T>& data, int node, int start, int end) {
-        if (start == end) {
-            tree[node] = data[start];
-        } else {
-            int mid = (start + end) / 2;
-            build(data, 2 * node, start, mid);
-            build(data, 2 * node + 1, mid + 1, end);
-            tree[node] = merge(tree[2 * node], tree[2 * node + 1]);
-        }
-    }
-
-    void update(int node, int start, int end, int idx, T val) {
-        if (start == end) {
-            tree[node] = val;  // For add: tree[node] += val;
-        } else {
-            int mid = (start + end) / 2;
-            if (start <= idx && idx <= mid)
-                update(2 * node, start, mid, idx, val);
-            else
-                update(2 * node + 1, mid + 1, end, idx, val);
-            tree[node] = merge(tree[2 * node], tree[2 * node + 1]);
-        }
-    }
-
-    T query(int node, int start, int end, int l, int r) { // NOTE: l, r are 1-indexed
-        if (r < start || end < l) return neutral;
-        if (l <= start && end <= r) return tree[node];
-        int mid = (start + end) / 2;
-        T p1 = query(2 * node, start, mid, l, r);
-        T p2 = query(2 * node + 1, mid + 1, end, l, r);
-        return merge(p1, p2);
-    }
-
-public:
-    SegmentTree(const vector<T>& data, T neutral_elem = 0) {
-        n = sz(data);
-        neutral = neutral_elem;
-        tree.resize(4 * n, neutral);
-        build(data, 1, 0, n - 1);
-    }
-
-    // 0-based index update
-    void update(int idx, T val) {
-        update(1, 0, n - 1, idx, val);
-    }
-
-    // 0-based range [l, r] query
-    T query(int l, int r) {
-        return query(1, 0, n - 1, l, r);
-    }
-};
-
-const int MAX_VAL = 1e5 + 5;
-
-struct WaveletTree {
-    int lo, hi;
-    WaveletTree *l = nullptr, *r = nullptr;
-    vector<int> b;
-
-    WaveletTree(vector<int>::iterator from, vector<int>::iterator to, int x, int y) {
-        lo = x, hi = y;
-        if (lo == hi || from >= to) return;
-        int mid = lo + (hi - lo) / 2;
-        auto f = [mid](int x) { return x <= mid; };
-        b.reserve(to - from + 1);
-        b.pb(0);
-        for (auto it = from; it != to; it++)
-            b.pb(b.back() + f(*it));
-        auto pivot = stable_partition(from, to, f);
-        l = new WaveletTree(from, pivot, lo, mid);
-        r = new WaveletTree(pivot, to, mid + 1, hi);
-    }
-
-    int kth(int l, int r, int k) {
-        if (l > r) return 0;
-        if (lo == hi) return lo;
-        int inLeft = b[r] - b[l - 1];
-        int lb = b[l - 1]; 
-        int rb = b[r];
-        if (k <= inLeft) return this->l->kth(lb + 1, rb, k);
-        return this->r->kth(l - lb, r - rb, k - inLeft);
-    }
-
-    int lte(int l, int r, int k) {
-        if (l > r || k < lo) return 0;
-        if (hi <= k) return r - l + 1;
-        int lb = b[l - 1], rb = b[r];
-        return this->l->lte(lb + 1, rb, k) + this->r->lte(l - lb, r - rb, k);
-    }
+    // Equations: (a1/d1 ± a2/d2)x + (b1/d1 ± b2/d2)y + (c1/d1 ± c2/d2) = 0
+    Line b1 = {l1.a/d1 + l2.a/d2, l1.b/d1 + l2.b/d2, l1.c/d1 + l2.c/d2};
+    Line b2 = {l1.a/d1 - l2.a/d2, l1.b/d1 - l2.b/d2, l1.c/d1 - l2.c/d2};
     
-    ~WaveletTree() {
-        delete l; delete r;
-    }
-};
-
-template <typename T>
-vector<T> sos_dp(vector<T> A, int num_bits) {
-    int size = 1 << num_bits;
-    for (int i = 0; i < num_bits; ++i) {
-        for (int mask = 0; mask < size; ++mask) {
-            if (mask & (1 << i)) {
-                A[mask] += A[mask ^ (1 << i)];
-            }
-        }
-    }
-    return A;
+    return {b1, b2};
 }
 
-struct DSU {
-    vector<int> p, r;
-    DSU(int n = 0) { init(n); }
-
-    void init(int n) {
-        p.resize(n);
-        r.assign(n, 0);
-        iota(all(p), 0);
-    }
-
-    int find(int x) {
-        if (p[x] == x) return x;
-        return p[x] = find(p[x]);
-    }
-
-    bool unite(int a, int b) {
-        a = find(a); b = find(b);
-        if (a == b) return false;
-        if (r[a] < r[b]) swap(a, b);
-        p[b] = a;
-        if (r[a] == r[b]) r[a]++;
-        return true;
-    }
-};
-
-void bfs(int src, vector<vector<int>>& g, vector<int>& dist) {
-    queue<int> q;
-    q.push(src);
-    dist[src] = 0;
-    while (!q.empty()) {
-        int u = q.front(); q.pop();
-        for (int v : g[u]) {
-            if (dist[v] == -1) {
-                dist[v] = dist[u] + 1;
-                q.push(v);
-            }
-        }
-    }
+Point getIncenter(Point A, Point B, Point C) {
+    ld a = dist(B, C);
+    ld b = dist(A, C);
+    ld c = dist(A, B);
+    return (A * a + B * b + C * c) / (a + b + c);
 }
 
-void dfs(int u, const vector<vector<int>>& g, vector<int>& vis) {
-    vis[u] = 1;
-    for (int v : g[u]) {
-        if (!vis[v]) {
-            dfs(v, g, vis);
-        }
-    }
+Point getCircumcenter(Point A, Point B, Point C) {
+    ld D = 2 * (A.x * (B.y - C.y) + B.x * (C.y - A.y) + C.x * (A.y - B.y));
+    // Check if D is nearly 0 for collinear points
+    ld ux = ((A.x * A.x + A.y * A.y) * (B.y - C.y) + (B.x * B.x + B.y * B.y) * (C.y - A.y) + (C.x * C.x + C.y * C.y) * (A.y - B.y)) / D;
+    ld uy = ((A.x * A.x + A.y * A.y) * (C.x - B.x) + (B.x * B.x + B.y * B.y) * (A.x - C.x) + (C.x * C.x + C.y * C.y) * (B.x - A.x)) / D;
+    return {ux, uy};
 }
 
-vector<ll> dijkstra(int s, vector<vector<pair<int,ll>>>& g) {
-    vector<ll> dist(sz(g), LINF);
-    priority_queue<pair<ll,int>, vector<pair<ll,int>>, greater<>> pq;
-    dist[s] = 0;
-    pq.push({0, s});
-    while (!pq.empty()) {
-        auto [d, u] = pq.top(); pq.pop();
-        if (d > dist[u]) continue;
-        for (auto [v, w] : g[u]) {
-            if (dist[v] > d + w) {
-                dist[v] = d + w;
-                pq.push({dist[v], v});
-            }
-        }
-    }
-    return dist;
+Point getOrthocenter(Point A, Point B, Point C) {
+    Point G = (A + B + C) / 3.0; // Centroid
+    Point O = getCircumcenter(A, B, C);
+    return (G * 3.0) - (O * 2.0);
 }
 
-ll binpow(ll a, ll b, ll mod = MOD) {
-    ll res = 1;
-    a %= mod;
-    while (b) {
-        if (b & 1) res = res * a % mod;
-        a = a * a % mod;
-        b >>= 1;
-    }
-    return res;
-}
-
-ll inv(ll a) {
-    return binpow(a, MOD - 2);
-}
-
-const int N = 2e5;
-ll fact[N], invfact[N];
-
-void init_comb() {
-    fact[0] = 1;
-    for (int i = 1; i < N; i++) fact[i] = fact[i-1] * i % MOD;
-    invfact[N-1] = inv(fact[N-1]);
-    for (int i = N-2; i >= 0; i--)
-        invfact[i] = invfact[i+1] * (i+1) % MOD;
-}
-
-ll nCr(int n, int r) {
-    if (r < 0 || r > n) return 0;
-    return fact[n] * invfact[r] % MOD * invfact[n-r] % MOD;
-}
-
-struct StringHash {
-    static const ll mod1 = 1000000007;
-    static const ll mod2 = 1000000009;
-    static const ll base = 911382323; // random large base
-
-    vector<ll> h1, h2, p1, p2;
-
-    StringHash(const string& s) {
-        int n = sz(s);
-        h1.resize(n + 1, 0);
-        h2.resize(n + 1, 0);
-        p1.resize(n + 1, 1);
-        p2.resize(n + 1, 1);
-
-        for (int i = 0; i < n; i++) {
-            h1[i + 1] = (h1[i] * base + s[i]) % mod1;
-            h2[i + 1] = (h2[i] * base + s[i]) % mod2;
-            p1[i + 1] = (p1[i] * base) % mod1;
-            p2[i + 1] = (p2[i] * base) % mod2;
-        }
-    }
-
-    // 0-based, inclusive
-    pair<ll,ll> get_hash(int l, int r) {
-        ll x1 = (h1[r + 1] - h1[l] * p1[r - l + 1]) % mod1;
-        ll x2 = (h2[r + 1] - h2[l] * p2[r - l + 1]) % mod2;
-        if (x1 < 0) x1 += mod1;
-        if (x2 < 0) x2 += mod2;
-        return {x1, x2};
-    }
-};
-
-int main() {
-    fast_io();
-
-    int t;
-    cin >> t;
-    while (t--) {
-        int n;
-        // cin >> n;
-        // vector<long long> arr(n);
-        // cin >> arr;
-
-    }
+struct Point3D {
+    ld x, y, z;
     
-    return 0;
+    Point3D operator+(const Point3D& other) const { return {x + other.x, y + other.y, z + other.z}; }
+    Point3D operator-(const Point3D& other) const { return {x - other.x, y - other.y, z - other.z}; }
+    Point3D operator*(ld scalar) const { return {x * scalar, y * scalar, z * scalar}; }
+    Point3D operator/(ld scalar) const { return {x / scalar, y / scalar, z / scalar}; }
 
+    // Dot Product: u . v
+    ld dot(const Point3D& other) const {
+        return x * other.x + y * other.y + z * other.z;
+    }
+
+    // Cross Product: u x v (Result is a vector perpendicular to both)
+    Point3D cross(const Point3D& other) const {
+        return {
+            y * other.z - z * other.y,
+            z * other.x - x * other.z,
+            x * other.y - y * other.x
+        };
+    }
+
+    // Magnitude squared
+    ld norm_sq() const {
+        return x*x + y*y + z*z;
+    }
+
+    // Magnitude (Length)
+    ld norm() const {
+        return sqrt(norm_sq());
+    }
+};
+
+struct Line3D {
+    Point3D p; // A point on the line
+    Point3D v; // Direction vector
+};
+
+// Equation of line from two points
+Line3D lineFromPoints(Point3D p1, Point3D p2) {
+    return {p1, p2 - p1};
+}
+
+// Intersection of two lines
+pair<bool, Point3D> intersect(Line3D l1, Line3D l2) {
+    Point3D p1 = l1.p, v1 = l1.v;
+    Point3D p2 = l2.p, v2 = l2.v;
+
+    Point3D p1p2 = p2 - p1;
+    
+    if (abs(p1p2.dot(v1.cross(v2))) > EPS) {
+        return {false, {0,0,0}}; 
+    }
+
+    Point3D crossProd = v1.cross(v2);
+    if (crossProd.norm() < EPS) {
+        return {false, {0,0,0}}; 
+    }
+    ld t1 = p1p2.cross(v2).dot(crossProd) / crossProd.norm_sq();
+    
+    return {true, p1 + v1 * t1};
+}
+
+ld triangleArea(Point3D a, Point3D b, Point3D c) {
+    Point3D ab = b - a;
+    Point3D ac = c - a;
+    return ab.cross(ac).norm() / 2.0;
+}
+
+// Perpendicular line to another line going through a given point
+Line3D perpendicularLine(Line3D l, Point3D p) {
+    Point3D ap = p - l.p;
+    ld t = ap.dot(l.v) / l.v.norm_sq();
+    Point3D projection = l.p + l.v * t;
+
+    return lineFromPoints(p, projection);
+}
+
+Point3D reflectPoint(Point3D p, Line3D l) {
+    Point3D ap = p - l.p;
+    ld t = ap.dot(l.v) / l.v.norm_sq();
+    Point3D projection = l.p + l.v * t;
+    
+    return projection * 2.0 - p;
+}
+
+ld dist(Point3D p1, Point3D p2) {
+    return (p1 - p2).norm();
+}
+
+struct Plane {
+    ld a, b, c, d; // ax + by + cz + d = 0
+};
+
+Plane planeFromPoints(Point3D p1, Point3D p2, Point3D p3) {
+    Point3D u = p2 - p1;
+    Point3D v = p3 - p1;
+
+    Point3D normal = u.cross(v);
+    if (normal.norm() < EPS) {
+        return {0, 0, 0, 0}; 
+    }
+    ld d = -normal.dot(p1);
+
+    return {normal.x, normal.y, normal.z, d};
+}
+
+pair<bool, Line3D> intersectPlanes(Plane p1, Plane p2) {
+    Point3D n1 = {p1.a, p1.b, p1.c};
+    Point3D n2 = {p2.a, p2.b, p2.c};
+    
+    Point3D v = n1.cross(n2);
+    if (v.norm() < EPS) return {false, {}};
+    Point3D p;
+    if (abs(v.z) > EPS) {
+        ld det = p1.a * p2.b - p2.a * p1.b;
+        p.x = (p1.b * p2.d - p2.b * p1.d) / det;
+        p.y = (p1.d * p2.a - p2.d * p1.a) / det;
+        p.z = 0;
+    } else if (abs(v.y) > EPS) {
+        ld det = p1.a * p2.c - p2.a * p1.c;
+        p.x = (p1.c * p2.d - p2.c * p1.d) / det;
+        p.z = (p1.d * p2.a - p2.d * p1.a) / det;
+        p.y = 0;
+    } else {
+        ld det = p1.b * p2.c - p2.b * p1.c;
+        p.y = (p1.c * p2.d - p2.c * p1.d) / det;
+        p.z = (p1.d * p2.b - p2.d * p1.b) / det;
+        p.x = 0;
+    }
+
+    return {true, {p, v}};
+}
+
+pair<bool, Point3D> intersectLinePlane(Line3D l, Plane pl) {
+    Point3D n = {pl.a, pl.b, pl.c};
+    ld dot_prod = n.dot(l.v);
+    if (abs(dot_prod) < EPS) return {false, {0, 0, 0}};
+    ld t = -(n.dot(l.p) + pl.d) / dot_prod;
+    
+    return {true, l.p + l.v * t};
+}
+
+Point3D reflectPointPlane(Point3D p, Plane pl) {
+    Point3D n = {pl.a, pl.b, pl.c};
+    ld dist_factor = (n.dot(p) + pl.d) / n.norm_sq();
+
+    return p - n * (2.0 * dist_factor);
+}
+
+// Shortest distance from Point to Plane (Bonus)
+ld pointPlaneDist(Point3D p, Plane pl) {
+    Point3D n = {pl.a, pl.b, pl.c};
+    return abs(n.dot(p) + pl.d) / n.norm();
 }
