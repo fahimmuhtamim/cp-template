@@ -15,6 +15,8 @@
 #include <numeric>
 using namespace std;
 
+#define int long long
+
 using ll = long long;
 using pii = pair<int, int>;
 using vi = vector<int>;
@@ -23,6 +25,9 @@ const int INF = 1e9;
 const ll LINF = 1e18;
 const int MOD = 1e9 + 7;
 
+typedef vector<bool> vb;
+typedef vector<vi> vvi;
+#define FOR(i,a,b) for(int i=a;i<b;i++)
 #define all(x) (x).begin(), (x).end()
 #define rall(x) (x).rbegin(), (x).rend()
 #define pb push_back
@@ -43,193 +48,6 @@ template<typename T>
 ostream& operator<<(ostream& os, const vector<T>& v) {
     for (int i = 0; i < sz(v); ++i) os << v[i] << (i == sz(v) - 1 ? "" : " ");
     return os;
-}
-
-template<typename T>
-class SegmentTree {
-    int n;
-    vector<T> tree;
-    T neutral;
-    
-    // Merge function (Sum/Min/Max/XOR)
-    T merge(T a, T b) {
-        return a + b; 
-    }
-
-    void build(const vector<T>& data, int node, int start, int end) {
-        if (start == end) {
-            tree[node] = data[start];
-        } else {
-            int mid = (start + end) / 2;
-            build(data, 2 * node, start, mid);
-            build(data, 2 * node + 1, mid + 1, end);
-            tree[node] = merge(tree[2 * node], tree[2 * node + 1]);
-        }
-    }
-
-    void update(int node, int start, int end, int idx, T val) {
-        if (start == end) {
-            tree[node] = val;  // For add: tree[node] += val;
-        } else {
-            int mid = (start + end) / 2;
-            if (start <= idx && idx <= mid)
-                update(2 * node, start, mid, idx, val);
-            else
-                update(2 * node + 1, mid + 1, end, idx, val);
-            tree[node] = merge(tree[2 * node], tree[2 * node + 1]);
-        }
-    }
-
-    T query(int node, int start, int end, int l, int r) { // NOTE: l, r are 1-indexed
-        if (r < start || end < l) return neutral;
-        if (l <= start && end <= r) return tree[node];
-        int mid = (start + end) / 2;
-        T p1 = query(2 * node, start, mid, l, r);
-        T p2 = query(2 * node + 1, mid + 1, end, l, r);
-        return merge(p1, p2);
-    }
-
-public:
-    SegmentTree(const vector<T>& data, T neutral_elem = 0) { // INF for min, -INF for max, 0 for sum/xor
-        n = sz(data);
-        neutral = neutral_elem;
-        tree.resize(4 * n, neutral);
-        build(data, 1, 0, n - 1);
-    }
-
-    // 0-based index update
-    void update(int idx, T val) {
-        update(1, 0, n - 1, idx, val);
-    }
-
-    // 0-based range [l, r] query
-    T query(int l, int r) {
-        return query(1, 0, n - 1, l, r);
-    }
-};
-
-const int MAX_VAL = 1e5 + 5;
-
-struct WaveletTree {
-    int lo, hi;
-    WaveletTree *l = nullptr, *r = nullptr;
-    vector<int> b;
-
-    WaveletTree(vector<int>::iterator from, vector<int>::iterator to, int x, int y) {
-        lo = x, hi = y;
-        if (lo == hi || from >= to) return;
-        int mid = lo + (hi - lo) / 2;
-        auto f = [mid](int x) { return x <= mid; };
-        b.reserve(to - from + 1);
-        b.pb(0);
-        for (auto it = from; it != to; it++)
-            b.pb(b.back() + f(*it));
-        auto pivot = stable_partition(from, to, f);
-        l = new WaveletTree(from, pivot, lo, mid);
-        r = new WaveletTree(pivot, to, mid + 1, hi);
-    }
-
-    // 1 based indexing
-    int kth(int l, int r, int k) { // Finds the k-th smallest element in the range
-        if (l > r) return 0;
-        if (lo == hi) return lo;
-        int inLeft = b[r] - b[l - 1];
-        int lb = b[l - 1]; 
-        int rb = b[r];
-        if (k <= inLeft) return this->l->kth(lb + 1, rb, k);
-        return this->r->kth(l - lb, r - rb, k - inLeft);
-    }
-
-    int lte(int l, int r, int k) { //lequal to k
-        if (l > r || k < lo) return 0;
-        if (hi <= k) return r - l + 1;
-        int lb = b[l - 1], rb = b[r];
-        return this->l->lte(lb + 1, rb, k) + this->r->lte(l - lb, r - rb, k);
-    }
-    
-    ~WaveletTree() {
-        delete l; delete r;
-    }
-};
-
-template <typename T>
-vector<T> sos_dp(vector<T> A, int num_bits) {
-    int size = 1 << num_bits;
-    for (int i = 0; i < num_bits; ++i) {
-        for (int mask = 0; mask < size; ++mask) {
-            if (mask & (1 << i)) {
-                A[mask] += A[mask ^ (1 << i)];
-            }
-        }
-    }
-    return A;
-}
-
-struct DSU {
-    vector<int> p, r;
-    DSU(int n = 0) { init(n); }
-
-    void init(int n) {
-        p.resize(n);
-        r.assign(n, 0);
-        iota(all(p), 0);
-    }
-
-    int find(int x) {
-        if (p[x] == x) return x;
-        return p[x] = find(p[x]);
-    }
-
-    bool unite(int a, int b) {
-        a = find(a); b = find(b);
-        if (a == b) return false;
-        if (r[a] < r[b]) swap(a, b);
-        p[b] = a;
-        if (r[a] == r[b]) r[a]++;
-        return true;
-    }
-};
-
-void bfs(int src, vector<vector<int>>& g, vector<int>& dist) {
-    queue<int> q;
-    q.push(src);
-    dist[src] = 0;
-    while (!q.empty()) {
-        int u = q.front(); q.pop();
-        for (int v : g[u]) {
-            if (dist[v] == -1) {
-                dist[v] = dist[u] + 1;
-                q.push(v);
-            }
-        }
-    }
-}
-
-void dfs(int u, const vector<vector<int>>& g, vector<int>& vis) {
-    vis[u] = 1;
-    for (int v : g[u]) {
-        if (!vis[v]) {
-            dfs(v, g, vis);
-        }
-    }
-}
-
-vector<ll> dijkstra(int s, vector<vector<pair<int,ll>>>& g) {
-    vector<ll> dist(sz(g), LINF);
-    priority_queue<pair<ll,int>, vector<pair<ll,int>>, greater<>> pq;
-    dist[s] = 0;
-    pq.push({0, s});
-    while (!pq.empty()) {
-        auto [d, u] = pq.top(); pq.pop();
-        if (d > dist[u]) continue;
-        for (auto [v, w] : g[u]) {
-            if (dist[v] > d + w) {
-                dist[v] = d + w;
-                pq.push({dist[v], v});
-            }
-        }
-    }
-    return dist;
 }
 
 ll binpow(ll a, ll b, ll mod = MOD) {
@@ -301,51 +119,7 @@ void solve() {
     vll a(n), b(m);
     cin >> a >> b;
     string s; cin >> s;
-
-    sort(b.begin(), b.end());
-
-    // displacement_map[d] = first time step where net displacement is d
-    map<int, int> first_reach;
-    int curr_disp = 0;
-    for (int i = 0; i < k; i++) {
-        if (s[i] == 'L') curr_disp--;
-        else curr_disp++;
-        
-        if (first_reach.find(curr_disp) == first_reach.end()) {
-            first_reach[curr_disp] = i + 1; // 1-based index
-        }
-    }
-
-    vi death_times;
-    for (int i = 0; i < n; i++) {
-        auto it = lower_bound(b.begin(), b.end(), a[i]);
-        int time = k + 1;
-
-        // Check right spike
-        if (it != b.end()) {
-            ll dist_r = *it - a[i];
-            if (first_reach.count(dist_r)) time = min(time, first_reach[dist_r]);
-        }
-        // Check left spike
-        if (it != b.begin()) {
-            ll dist_l = a[i] - *prev(it);
-            if (first_reach.count(-dist_l)) time = min(time, first_reach[-dist_l]);
-        }
-        death_times.pb(time);
-    }
-
-    // count_at_time[t] = number of robots that die at exactly time t
-    vi count_at_time(k + 2, 0);
-    for (int t : death_times) {
-        if (t <= k) count_at_time[t]++;
-    }
-
-    int alive = n;
-    for (int i = 1; i <= k; i++) {
-        alive -= count_at_time[i];
-        cout << alive << (i == k ? "" : " ");
-    }
-    cout << "\n";
+    sort(all(b));
 }
 
 int main() {
@@ -355,10 +129,6 @@ int main() {
     cin >> t;
     while (t--) {
         solve();
-        // cin >> n;
-        // vector<long long> arr(n);
-        // cin >> arr;
-
     }
     
     return 0;
