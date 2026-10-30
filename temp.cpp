@@ -81,6 +81,11 @@ ll nCr(int n, int r) {
     return fact[n] * invfact[r] % MOD * invfact[n-r] % MOD;
 }
 
+ll nPr(int n, int r) {
+    if (r < 0) return 0;
+    return fact[n] * invfact[n-r] % MOD;
+}
+
 struct StringHash {
     static const ll mod1 = 1000000007;
     static const ll mod2 = 1000000009;
